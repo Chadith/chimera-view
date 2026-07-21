@@ -2,7 +2,7 @@
 <html lang="en">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Chimera — Facial Symmetry Viewer</title>
+<title>MyoMirror — Facial Symmetry Viewer</title>
 <style>
   :root{
     --ink:#0d1114;
@@ -186,7 +186,7 @@
 <div class="wrap">
   <header>
     <div class="brand">
-      <h1>Chimera<span class="split">|</span>View</h1>
+      <h1>Myo<span class="split">|</span>Mirror</h1>
       <span class="tagline">Facial symmetry viewer — split, mirror, compare</span>
     </div>
     <span class="privacy">Runs locally · photos never leave this device</span>
@@ -709,7 +709,7 @@
   document.querySelectorAll('.dl').forEach(btn => btn.onclick = () => {
     const c = document.getElementById(btn.dataset.dl);
     const a = document.createElement('a');
-    a.download = `chimera-${btn.dataset.name}.png`;
+    a.download = `myomirror-${btn.dataset.name}.png`;
     a.href = c.toDataURL('image/png');
     a.click();
   });
