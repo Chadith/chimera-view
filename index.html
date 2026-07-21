@@ -88,7 +88,7 @@
   .cam-bar select{font:inherit;font-size:12px;background:rgba(0,0,0,.55);color:#fff;
     border:1px solid rgba(255,255,255,.25);border-radius:var(--radius);padding:8px 10px;max-width:190px;display:none}
   .cam-bar select.multi{display:block}
-  .cam-error{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;
+  .cam-error{position:absolute;inset:0;z-index:9;display:none;flex-direction:column;align-items:center;justify-content:center;
     gap:10px;padding:32px;text-align:center;background:var(--panel)}
   .cam-error.active{display:flex}
   .cam-error p{color:var(--muted);max-width:40ch;font-size:13px}
@@ -386,13 +386,15 @@
   }
 
   function updateOverlays() {
-    const aligning = !!rawImg || live.classList.contains('active');
+    const errorShowing = camError.classList.contains('active');
+    const aligning = (!!rawImg || live.classList.contains('active')) && !errorShowing;
     rotRail.classList.toggle('on', aligning);
     checkOverlay.classList.toggle('on', aligning && !checkDismissed);
   }
 
   function setImage(image, keepRot) {
     stopCamera();
+    camError.classList.remove('active');
     rawImg = image;
     mid = 0.5;
     midline.value = 50;
@@ -531,12 +533,18 @@
       return showCamError('This browser can’t show a live camera view here. "Open camera app" takes the photo with your device’s own camera and drops it straight in.');
     }
     const size = { width: { ideal: 1280 }, height: { ideal: 1440 } };
+    const gumPromise = navigator.mediaDevices.getUserMedia({
+      video: deviceId ? { deviceId: { exact: deviceId }, ...size } : { facingMode: facing, ...size },
+      audio: false
+    });
+    let gaveUp = false;
+    // if this resolves after we've already given up (timeout), close it immediately —
+    // otherwise a late-arriving stream leaks the camera and keeps the OS "in use" indicator on
+    gumPromise.then(s => { if (gaveUp) s.getTracks().forEach(t => t.stop()); }, () => {});
     try {
-      stream = await navigator.mediaDevices.getUserMedia({
-        video: deviceId ? { deviceId: { exact: deviceId }, ...size } : { facingMode: facing, ...size },
-        audio: false
-      });
+      stream = await withTimeout(gumPromise, 8000);
     } catch (err) {
+      gaveUp = true;
       // remembered device may be gone (unplugged, iPhone out of range) — retry with defaults
       if (deviceId) {
         deviceId = null;
@@ -544,7 +552,10 @@
         return openCamera();
       }
       const denied = err && (err.name === 'NotAllowedError' || err.name === 'SecurityError');
-      const msg = denied && embedded
+      const timedOut = err && err.message === 'timeout';
+      const msg = timedOut
+        ? 'The camera didn’t respond in time. "Open camera app" uses your device’s own camera instead — the photo drops straight in, nothing is uploaded.'
+        : denied && embedded
         ? 'This embedded page isn’t allowed to open a live camera view. "Open camera app" uses your device’s own camera instead — the photo drops straight in, nothing is uploaded.'
         : denied
           ? 'Camera access was denied. Allow camera permission for this page, or use "Open camera app" to take the photo with your device’s camera.'
@@ -590,6 +601,14 @@
     stopCamera();
     camErrorMsg.textContent = msg;
     camError.classList.add('active');
+    updateOverlays();
+  }
+
+  function withTimeout(promise, ms) {
+    return Promise.race([
+      promise,
+      new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), ms))
+    ]);
   }
 
   function captureFrame() {
@@ -647,12 +666,18 @@
   document.getElementById('camErrorBack').onclick = () => {
     camError.classList.remove('active');
     if (!img) empty.classList.remove('hidden');
+    updateOverlays();
   };
   document.getElementById('nativeCamBtn').onclick = () => {
     camError.classList.remove('active');
     if (!img) empty.classList.remove('hidden');
+    updateOverlays();
     captureInput.click();
   };
+  // release the camera if the tab is backgrounded — prevents a zombie stream from
+  // keeping the OS "camera in use" indicator on and blocking the next attempt
+  document.addEventListener('visibilitychange', () => { if (document.hidden) stopCamera(); });
+  window.addEventListener('pagehide', stopCamera);
   captureInput.onchange = e => { loadFile(e.target.files[0]); captureInput.value = ''; };
 
   // ---------- events ----------
