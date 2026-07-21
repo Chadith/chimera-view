@@ -457,11 +457,45 @@
     c.getContext('2d').drawImage(src, 0, 0);
   }
 
+  // burn a small corner badge (e.g. "PR"/"PL") into the composite so exported
+  // images are self-identifying. corner: 'bl' = lower-left, 'br' = lower-right.
+  function drawBadge(id, text, corner) {
+    const c = document.getElementById(id);
+    const x = c.getContext('2d');
+    const s = Math.max(11, Math.round(c.width * 0.032)); // font size scales with image
+    const padX = Math.round(s * 0.55), padY = Math.round(s * 0.38);
+    const margin = Math.round(s * 0.7);
+    x.font = `600 ${s}px ${getComputedStyle(document.body).fontFamily}`;
+    x.textBaseline = 'alphabetic';
+    const tw = x.measureText(text).width;
+    const bw = tw + padX * 2, bh = s + padY * 2;
+    const bx = corner === 'br' ? c.width - margin - bw : margin;
+    const by = c.height - margin - bh;
+    const r = Math.round(bh * 0.28);
+    x.beginPath();
+    x.moveTo(bx + r, by);
+    x.arcTo(bx + bw, by, bx + bw, by + bh, r);
+    x.arcTo(bx + bw, by + bh, bx, by + bh, r);
+    x.arcTo(bx, by + bh, bx, by, r);
+    x.arcTo(bx, by, bx + bw, by, r);
+    x.closePath();
+    x.fillStyle = 'rgba(8,12,15,0.66)';
+    x.fill();
+    x.strokeStyle = 'rgba(255,255,255,0.28)';
+    x.lineWidth = Math.max(1, s * 0.06);
+    x.stroke();
+    x.fillStyle = '#7fe0d3';
+    x.textAlign = 'left';
+    x.fillText(text, bx + padX, by + padY + s * 0.82);
+  }
+
   function generate() {
     if (!img) return;
     blit('outOriginal', img);
     blit('outLeft', mirrorComposite(true));
     blit('outRight', mirrorComposite(false));
+    drawBadge('outLeft', 'PR', 'bl');   // Patient Right — lower left
+    drawBadge('outRight', 'PL', 'br');  // Patient Left — lower right
     const m = Math.round(mid * img.width);
     readout.textContent =
       `split at x=${m}px of ${img.width}px  ·  patient right ${m * 2}×${img.height}  ·  patient left ${(img.width - m) * 2}×${img.height}`;
