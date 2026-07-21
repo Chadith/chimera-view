@@ -126,21 +126,30 @@
   .rot-reset:hover:not(:disabled){color:var(--text);background:rgba(255,255,255,.12)}
   .rot-reset:disabled{opacity:.4;cursor:default}
 
-  /* compact photo checklist overlay, visible while framing and aligning */
-  .check-overlay{position:absolute;top:10px;right:10px;z-index:7;max-width:225px;display:none;
-    background:rgba(10,14,17,.74);border:1px solid rgba(255,255,255,.16);border-radius:var(--radius);
-    padding:10px 26px 10px 12px;backdrop-filter:blur(4px)}
-  .check-overlay.on{display:block}
-  .check-overlay li{list-style:none;font-size:11px;color:#cdd6dd;display:flex;gap:7px;line-height:1.5}
-  .check-overlay li::before{content:"—";color:var(--accent);flex-shrink:0}
-  .check-x{position:absolute;top:2px;right:2px;background:none;border:none;padding:4px 8px;
-    color:var(--muted);font-size:14px;cursor:pointer;line-height:1}
+  /* photo checklist — a prominent centered modal shown before framing */
+  .check-overlay{position:absolute;inset:0;z-index:8;display:none;align-items:center;justify-content:center;
+    padding:20px;background:rgba(6,9,12,.72);backdrop-filter:blur(3px)}
+  .check-overlay.on{display:flex}
+  .check-card{width:100%;max-width:380px;background:var(--panel);border:1px solid rgba(255,255,255,.16);
+    border-radius:14px;padding:22px 22px 18px;box-shadow:0 18px 48px rgba(0,0,0,.5)}
+  .check-card h3{margin:0 0 4px;font-size:17px;color:var(--text);font-weight:600}
+  .check-card .sub{margin:0 0 14px;font-size:13px;color:var(--muted)}
+  .check-overlay ul{margin:0 0 18px;padding:0}
+  .check-overlay li{list-style:none;font-size:15px;color:#e7edf1;display:flex;gap:10px;
+    line-height:1.4;padding:6px 0}
+  .check-overlay li::before{content:"✓";color:var(--accent);flex-shrink:0;font-weight:700}
+  .check-gotit{width:100%;font:inherit;font-size:15px;font-weight:600;color:#08211e;
+    background:var(--accent);border:1px solid var(--accent);border-radius:var(--radius);
+    padding:12px;cursor:pointer}
+  .check-gotit:hover{background:#63c8bd}
+  .check-x{position:absolute;top:8px;right:10px;background:none;border:none;padding:6px 10px;
+    color:var(--muted);font-size:20px;cursor:pointer;line-height:1;z-index:1}
   .check-x:hover{color:var(--text)}
-  .tips-btn{position:absolute;top:10px;right:10px;z-index:7;display:none;font:inherit;font-size:11px;
-    letter-spacing:.04em;color:var(--muted);background:rgba(10,14,17,.74);border:1px solid rgba(255,255,255,.16);
-    border-radius:var(--radius);padding:6px 12px;backdrop-filter:blur(4px);cursor:pointer}
+  .tips-btn{position:absolute;top:10px;right:10px;z-index:7;display:none;font:inherit;font-size:12px;
+    letter-spacing:.04em;color:var(--text);background:rgba(10,14,17,.82);border:1px solid rgba(255,255,255,.2);
+    border-radius:var(--radius);padding:7px 13px;backdrop-filter:blur(4px);cursor:pointer}
   .tips-btn.on{display:block}
-  .tips-btn:hover{color:var(--text);background:rgba(10,14,17,.9)}
+  .tips-btn:hover{background:rgba(10,14,17,.95)}
 
   /* live mode sizes the stage to the viewport so video + controls share one screen */
   .stage.live-mode{min-height:min(66dvh,600px)}
@@ -158,8 +167,8 @@
     .live .countdown{font-size:88px}
     .rot-slot{height:128px}
     .rot-slot input[type=range]{height:128px}
-    .check-overlay{max-width:190px;padding:8px 24px 8px 10px}
-    .check-overlay li{font-size:10px}
+    .check-card{padding:18px 16px 16px}
+    .check-overlay li{font-size:14px}
   }
 
   /* ---------- controls ---------- */
@@ -268,13 +277,18 @@
           <button class="rot-reset" id="resetBtn" disabled>Reset</button>
         </div>
         <div class="check-overlay" id="checkOverlay">
-          <button class="check-x" id="checkClose" aria-label="Hide checklist">×</button>
-          <ul>
-            <li>Eyes level, look into the lens</li>
-            <li>Neutral expression — no smile</li>
-            <li>No glasses or hats; hair off the ears</li>
-            <li>Frame the face down to the neck</li>
-          </ul>
+          <div class="check-card">
+            <button class="check-x" id="checkClose" aria-label="Close tips">×</button>
+            <h3>Before you take the photo</h3>
+            <p class="sub">Close this to line up your shot.</p>
+            <ul>
+              <li>Eyes level, look into the lens</li>
+              <li>Neutral expression — no smile</li>
+              <li>No glasses or hats; hair off the ears</li>
+              <li>Frame the face down to the neck</li>
+            </ul>
+            <button class="check-gotit" id="checkGotit">Got it</button>
+          </div>
         </div>
         <button class="tips-btn" id="tipsBtn" aria-label="Show photo tips">Tips</button>
       </div>
@@ -292,7 +306,7 @@
       </div>
       <div class="btn-row">
         <button class="ghost two-line" id="retakeBtn">Camera<br>settings</button>
-        <button class="ghost two-line" id="replaceBtn">Replace<br>photo</button>
+        <button class="ghost two-line" id="replaceBtn">Start<br>over</button>
       </div>
 
       <h2>Photo checklist</h2>
@@ -438,6 +452,25 @@
     results.classList.add('hidden');
     bake(); drawStage();
     updateOverlays();
+  }
+
+  // full reset back to the opening landing screen (Use camera / Choose photo / Sample face)
+  function resetToStart() {
+    stopCamera();
+    camError.classList.remove('active');
+    rawImg = null; img = null;
+    mid = 0.5; rot = 0;
+    midline.value = 50; rotate.value = 0;
+    midOut.textContent = '50.0%'; rotVal.textContent = '0.0°';
+    midline.disabled = generateBtn.disabled = resetBtn.disabled = true;
+    results.classList.add('hidden');
+    stage.classList.remove('has-img');
+    checkDismissed = false; // re-arm the tips modal for the next capture/upload
+    coords.textContent = '—';
+    sc.width = 0; sc.height = 0;
+    empty.classList.remove('hidden');
+    updateOverlays();
+    stage.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }
 
   function loadFile(file) {
@@ -750,7 +783,7 @@
 
   // ---------- events ----------
   document.getElementById('pickBtn').onclick = () => fileInput.click();
-  document.getElementById('replaceBtn').onclick = () => fileInput.click();
+  document.getElementById('replaceBtn').onclick = resetToStart;
   document.getElementById('sampleBtn').onclick = sampleFace;
   fileInput.onchange = e => loadFile(e.target.files[0]);
 
@@ -772,10 +805,9 @@
     if (stream) updateVideoTransform();
     else { bake(); drawStage(); }
   };
-  document.getElementById('checkClose').onclick = () => {
-    checkDismissed = true;
-    updateOverlays();
-  };
+  const dismissTips = () => { checkDismissed = true; updateOverlays(); };
+  document.getElementById('checkClose').onclick = dismissTips;
+  document.getElementById('checkGotit').onclick = dismissTips;
   tipsBtn.onclick = () => {
     checkDismissed = false;
     updateOverlays();
