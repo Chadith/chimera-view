@@ -752,13 +752,30 @@
   }));
   stage.addEventListener('drop', e => loadFile(e.dataTransfer.files[0]));
 
-  // downloads
-  document.querySelectorAll('.dl').forEach(btn => btn.onclick = () => {
+  // downloads — iOS Safari ignores <a download> for images (just opens the picture in a
+  // new tab), so offer the native share sheet first: it has "Save Image" (Camera Roll)
+  // and "Save to Files" built in. Fall back to a direct download where share-with-files
+  // isn't supported (desktop browsers, most of Android).
+  document.querySelectorAll('.dl').forEach(btn => btn.onclick = async () => {
     const c = document.getElementById(btn.dataset.dl);
+    const filename = `myomirror-${btn.dataset.name}.png`;
+    const blob = await new Promise(res => c.toBlob(res, 'image/png'));
+    if (!blob) return;
+    const file = new File([blob], filename, { type: 'image/png' });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      try {
+        await navigator.share({ files: [file] });
+        return;
+      } catch (err) {
+        if (err && err.name === 'AbortError') return; // user dismissed the sheet
+      }
+    }
+    const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.download = `myomirror-${btn.dataset.name}.png`;
-    a.href = c.toDataURL('image/png');
+    a.download = filename;
+    a.href = url;
     a.click();
+    URL.revokeObjectURL(url);
   });
 
   window.addEventListener('resize', drawStage);
