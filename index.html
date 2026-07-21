@@ -119,6 +119,11 @@
   .check-x{position:absolute;top:2px;right:2px;background:none;border:none;padding:4px 8px;
     color:var(--muted);font-size:14px;cursor:pointer;line-height:1}
   .check-x:hover{color:var(--text)}
+  .tips-btn{position:absolute;top:10px;right:10px;z-index:7;display:none;font:inherit;font-size:11px;
+    letter-spacing:.04em;color:var(--muted);background:rgba(10,14,17,.74);border:1px solid rgba(255,255,255,.16);
+    border-radius:var(--radius);padding:6px 12px;backdrop-filter:blur(4px);cursor:pointer}
+  .tips-btn.on{display:block}
+  .tips-btn:hover{color:var(--text);background:rgba(10,14,17,.9)}
 
   /* live mode sizes the stage to the viewport so video + controls share one screen */
   .stage.live-mode{min-height:min(66dvh,600px)}
@@ -253,6 +258,7 @@
             <li>Frame the face down to the neck</li>
           </ul>
         </div>
+        <button class="tips-btn" id="tipsBtn" aria-label="Show photo tips">Tips</button>
       </div>
     </div>
 
@@ -267,7 +273,7 @@
         <button class="primary" id="generateBtn" disabled>Generate composites</button>
       </div>
       <div class="btn-row">
-        <button class="ghost" id="retakeBtn">Camera</button>
+        <button class="ghost" id="retakeBtn">Camera settings</button>
         <button class="ghost" id="replaceBtn">Replace photo</button>
       </div>
 
@@ -334,6 +340,7 @@
   const rotVal = document.getElementById('rotVal');
   const rotRail = document.getElementById('rotRail');
   const checkOverlay = document.getElementById('checkOverlay');
+  const tipsBtn = document.getElementById('tipsBtn');
   let checkDismissed = false;
   const coords = document.getElementById('coords');
   const generateBtn = document.getElementById('generateBtn');
@@ -394,6 +401,7 @@
     const aligning = (!!rawImg || live.classList.contains('active')) && !errorShowing;
     rotRail.classList.toggle('on', aligning);
     checkOverlay.classList.toggle('on', aligning && !checkDismissed);
+    tipsBtn.classList.toggle('on', aligning && checkDismissed);
   }
 
   function setImage(image, keepRot) {
@@ -710,7 +718,11 @@
   };
   document.getElementById('checkClose').onclick = () => {
     checkDismissed = true;
-    checkOverlay.classList.remove('on');
+    updateOverlays();
+  };
+  tipsBtn.onclick = () => {
+    checkDismissed = false;
+    updateOverlays();
   };
   generateBtn.onclick = generate;
 
