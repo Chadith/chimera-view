@@ -290,15 +290,15 @@
       <figure class="out">
         <div class="img"><canvas id="outLeft"></canvas></div>
         <figcaption class="meta">
-          <span class="name">Left <em>|</em> Left</span>
-          <button class="dl" data-dl="outLeft" data-name="left-left">Download</button>
+          <span class="name">Patient <em>|</em> Right</span>
+          <button class="dl" data-dl="outLeft" data-name="patient-right">Download</button>
         </figcaption>
       </figure>
       <figure class="out">
         <div class="img"><canvas id="outRight"></canvas></div>
         <figcaption class="meta">
-          <span class="name">Right <em>|</em> Right</span>
-          <button class="dl" data-dl="outRight" data-name="right-right">Download</button>
+          <span class="name">Patient <em>|</em> Left</span>
+          <button class="dl" data-dl="outRight" data-name="patient-left">Download</button>
         </figcaption>
       </figure>
     </div>
@@ -451,7 +451,7 @@
     blit('outRight', mirrorComposite(false));
     const m = Math.round(mid * img.width);
     readout.textContent =
-      `split at x=${m}px of ${img.width}px  ·  left-left ${m * 2}×${img.height}  ·  right-right ${(img.width - m) * 2}×${img.height}`;
+      `split at x=${m}px of ${img.width}px  ·  patient right ${m * 2}×${img.height}  ·  patient left ${(img.width - m) * 2}×${img.height}`;
     results.classList.remove('hidden');
     results.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
