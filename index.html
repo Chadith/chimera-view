@@ -71,10 +71,9 @@
   .live{position:absolute;inset:0;display:none;background:#000}
   .live.active{display:block}
   .live video{width:100%;height:100%;object-fit:cover;display:block}
-  .live video.mirrored{transform:scaleX(-1)}
   .live .guide-v{position:absolute;top:0;bottom:0;left:50%;width:0;border-left:1.5px solid rgba(255,92,92,.9);pointer-events:none}
   .live .guide-h{position:absolute;left:0;right:0;top:42%;height:0;border-top:1px dashed rgba(255,92,92,.45);pointer-events:none}
-  .live .guide-tip{position:absolute;top:10px;left:50%;transform:translateX(-50%);font-family:var(--mono);
+  .live .guide-tip{position:absolute;bottom:96px;left:50%;transform:translateX(-50%);font-family:var(--mono);
     font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.85);
     background:rgba(0,0,0,.45);padding:4px 10px;border-radius:3px;pointer-events:none;white-space:nowrap}
   .live .countdown{position:absolute;inset:0;display:none;align-items:center;justify-content:center;
@@ -94,6 +93,28 @@
   .cam-error.active{display:flex}
   .cam-error p{color:var(--muted);max-width:40ch;font-size:13px}
 
+  /* on-stage rotation rail — vertical slider along the left edge */
+  .rot-rail{position:absolute;left:10px;top:50%;transform:translateY(-50%);z-index:7;display:none;
+    flex-direction:column;align-items:center;gap:6px;background:rgba(10,14,17,.62);
+    border:1px solid rgba(255,255,255,.16);border-radius:var(--radius);padding:10px 7px;backdrop-filter:blur(4px)}
+  .rot-rail.on{display:flex}
+  .rot-tag{font-family:var(--mono);font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+  .rot-slot{width:26px;height:170px;position:relative}
+  .rot-slot input{position:absolute;left:50%;top:50%;width:170px;height:22px;margin:0;
+    transform:translate(-50%,-50%) rotate(-90deg)}
+  .rot-val{font-family:var(--mono);font-size:10px;color:var(--accent);font-variant-numeric:tabular-nums}
+
+  /* compact photo checklist overlay, visible while framing and aligning */
+  .check-overlay{position:absolute;top:10px;right:10px;z-index:7;max-width:225px;display:none;
+    background:rgba(10,14,17,.74);border:1px solid rgba(255,255,255,.16);border-radius:var(--radius);
+    padding:10px 26px 10px 12px;backdrop-filter:blur(4px)}
+  .check-overlay.on{display:block}
+  .check-overlay li{list-style:none;font-size:11px;color:#cdd6dd;display:flex;gap:7px;line-height:1.5}
+  .check-overlay li::before{content:"—";color:var(--accent);flex-shrink:0}
+  .check-x{position:absolute;top:2px;right:2px;background:none;border:none;padding:4px 8px;
+    color:var(--muted);font-size:14px;cursor:pointer;line-height:1}
+  .check-x:hover{color:var(--text)}
+
   /* live mode sizes the stage to the viewport so video + controls share one screen */
   .stage.live-mode{min-height:min(66dvh,600px)}
   @media (max-width:600px){
@@ -106,8 +127,12 @@
     .cam-bar button{padding:7px 10px;font-size:13px}
     .cam-bar .shutter{width:50px;height:50px}
     .cam-bar select{flex-basis:100%;max-width:none;order:5}
-    .live .guide-tip{font-size:9px;max-width:92%;white-space:normal;text-align:center}
+    .live .guide-tip{font-size:9px;max-width:92%;white-space:normal;text-align:center;bottom:118px}
     .live .countdown{font-size:88px}
+    .rot-slot{height:128px}
+    .rot-slot input{width:128px}
+    .check-overlay{max-width:190px;padding:8px 24px 8px 10px}
+    .check-overlay li{font-size:10px}
   }
 
   /* ---------- controls ---------- */
@@ -206,6 +231,20 @@
             <button id="camErrorBack">Back</button>
           </div>
         </div>
+        <div class="rot-rail" id="rotRail">
+          <span class="rot-tag">Tilt</span>
+          <div class="rot-slot"><input type="range" id="rotate" min="-10" max="10" step="0.1" value="0" aria-label="Fine rotation"></div>
+          <output class="rot-val" id="rotVal">0.0°</output>
+        </div>
+        <div class="check-overlay" id="checkOverlay">
+          <button class="check-x" id="checkClose" aria-label="Hide checklist">×</button>
+          <ul>
+            <li>Eyes level, look into the lens</li>
+            <li>Neutral expression — no smile</li>
+            <li>No glasses or hats; hair off the ears</li>
+            <li>Frame the face down to the neck</li>
+          </ul>
+        </div>
       </div>
     </div>
 
@@ -215,11 +254,6 @@
         <div class="row"><label for="midline">Midline position</label><output id="midOut">50.0%</output></div>
         <input type="range" id="midline" min="20" max="80" step="0.1" value="50" disabled>
         <span class="hint">Drag the red cursor on the photo, or use this slider. Place it exactly on the facial midline — nose bridge to chin.</span>
-      </div>
-      <div class="ctl">
-        <div class="row"><label for="rotate">Fine rotation</label><output id="rotOut">0.0°</output></div>
-        <input type="range" id="rotate" min="-10" max="10" step="0.1" value="0" disabled>
-        <span class="hint">Level the eyes if the head is slightly tilted.</span>
       </div>
       <div class="btn-row">
         <button class="primary" id="generateBtn" disabled>Generate composites</button>
@@ -287,7 +321,10 @@
   const midline = document.getElementById('midline');
   const rotate = document.getElementById('rotate');
   const midOut = document.getElementById('midOut');
-  const rotOut = document.getElementById('rotOut');
+  const rotVal = document.getElementById('rotVal');
+  const rotRail = document.getElementById('rotRail');
+  const checkOverlay = document.getElementById('checkOverlay');
+  let checkDismissed = false;
   const coords = document.getElementById('coords');
   const generateBtn = document.getElementById('generateBtn');
   const resetBtn = document.getElementById('resetBtn');
@@ -342,17 +379,27 @@
     coords.textContent = `midline ${(mid * 100).toFixed(1)}%  ·  rot ${rot.toFixed(1)}°  ·  ${img.width}×${img.height}px`;
   }
 
-  function setImage(image) {
+  function updateOverlays() {
+    const aligning = !!rawImg || live.classList.contains('active');
+    rotRail.classList.toggle('on', aligning);
+    checkOverlay.classList.toggle('on', aligning && !checkDismissed);
+  }
+
+  function setImage(image, keepRot) {
     stopCamera();
     rawImg = image;
-    mid = 0.5; rot = 0;
-    midline.value = 50; rotate.value = 0;
-    midOut.textContent = '50.0%'; rotOut.textContent = '0.0°';
-    midline.disabled = rotate.disabled = generateBtn.disabled = resetBtn.disabled = false;
+    mid = 0.5;
+    midline.value = 50;
+    midOut.textContent = '50.0%';
+    if (!keepRot) {
+      rot = 0; rotate.value = 0; rotVal.textContent = '0.0°';
+    }
+    midline.disabled = generateBtn.disabled = resetBtn.disabled = false;
     empty.classList.add('hidden');
     stage.classList.add('has-img');
     results.classList.add('hidden');
     bake(); drawStage();
+    updateOverlays();
   }
 
   function loadFile(file) {
@@ -510,20 +557,28 @@
     deviceId = currentId || deviceId;
     fillCamSelect(cams, deviceId);
     video.srcObject = stream;
-    video.classList.toggle('mirrored', facing === 'user');
+    updateVideoTransform();
     empty.classList.add('hidden');
     live.classList.add('active');
     stage.classList.add('live-mode');
+    updateOverlays();
     stage.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  // preview mirroring + tilt; transform order matches the capture-then-bake pipeline
+  function updateVideoTransform() {
+    video.style.transform = 'rotate(' + rot + 'deg) scaleX(' + (facing === 'user' ? -1 : 1) + ')';
   }
 
   function stopCamera() {
     if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
     video.srcObject = null;
+    video.style.transform = '';
     live.classList.remove('active');
     stage.classList.remove('live-mode');
     countdown.classList.remove('active');
     counting = false;
+    updateOverlays();
   }
 
   function showCamError(msg) {
@@ -541,7 +596,8 @@
     if (facing === 'user') { x.translate(c.width, 0); x.scale(-1, 1); }
     x.drawImage(video, 0, 0);
     const image = new Image();
-    image.onload = () => { stopCamera(); setImage(image); };
+    // keep any tilt dialed in during the live preview — bake() applies it to the capture
+    image.onload = () => { stopCamera(); setImage(image, true); };
     image.src = c.toDataURL('image/png');
   }
 
@@ -603,7 +659,7 @@
   document.getElementById('resetBtn').onclick = () => {
     mid = 0.5; rot = 0;
     midline.value = 50; rotate.value = 0;
-    midOut.textContent = '50.0%'; rotOut.textContent = '0.0°';
+    midOut.textContent = '50.0%'; rotVal.textContent = '0.0°';
     bake(); drawStage();
   };
 
@@ -614,8 +670,13 @@
   };
   rotate.oninput = () => {
     rot = +rotate.value;
-    rotOut.textContent = rot.toFixed(1) + '°';
-    bake(); drawStage();
+    rotVal.textContent = rot.toFixed(1) + '°';
+    if (stream) updateVideoTransform();
+    else { bake(); drawStage(); }
+  };
+  document.getElementById('checkClose').onclick = () => {
+    checkDismissed = true;
+    checkOverlay.classList.remove('on');
   };
   generateBtn.onclick = generate;
 
