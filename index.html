@@ -99,9 +99,10 @@
     border:1px solid rgba(255,255,255,.16);border-radius:var(--radius);padding:10px 7px;backdrop-filter:blur(4px)}
   .rot-rail.on{display:flex}
   .rot-tag{font-family:var(--mono);font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
-  .rot-slot{width:26px;height:170px;position:relative}
-  .rot-slot input{position:absolute;left:50%;top:50%;width:170px;height:22px;margin:0;
-    transform:translate(-50%,-50%) rotate(-90deg)}
+  .rot-slot{width:26px;height:170px;position:relative;display:flex;justify-content:center}
+  .rot-slot input[type=range]{
+    writing-mode:vertical-lr; direction:rtl; -webkit-appearance:slider-vertical;
+    width:22px; height:170px; margin:0; accent-color:var(--accent)}
   .rot-val{font-family:var(--mono);font-size:10px;color:var(--accent);font-variant-numeric:tabular-nums}
 
   /* compact photo checklist overlay, visible while framing and aligning */
@@ -130,7 +131,7 @@
     .live .guide-tip{font-size:9px;max-width:92%;white-space:normal;text-align:center;bottom:118px}
     .live .countdown{font-size:88px}
     .rot-slot{height:128px}
-    .rot-slot input{width:128px}
+    .rot-slot input[type=range]{height:128px}
     .check-overlay{max-width:190px;padding:8px 24px 8px 10px}
     .check-overlay li{font-size:10px}
   }
