@@ -163,6 +163,7 @@
   button.primary:hover{background:#63c8bd}
   button.primary:disabled{background:var(--panel-2);border-color:var(--line);color:var(--faint);cursor:not-allowed}
   button.ghost{background:none}
+  button.two-line{line-height:1.15;letter-spacing:-.01em}
   .btn-row{display:flex;gap:10px;flex-wrap:wrap}
   .btn-row button{flex:1}
 
@@ -273,8 +274,8 @@
         <button class="primary" id="generateBtn" disabled>Generate composites</button>
       </div>
       <div class="btn-row">
-        <button class="ghost" id="retakeBtn">Camera settings</button>
-        <button class="ghost" id="replaceBtn">Replace photo</button>
+        <button class="ghost two-line" id="retakeBtn">Camera<br>settings</button>
+        <button class="ghost two-line" id="replaceBtn">Replace<br>photo</button>
       </div>
 
       <h2>Photo checklist</h2>
