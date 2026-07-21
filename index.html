@@ -1,0 +1,705 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chimera — Facial Symmetry Viewer</title>
+<style>
+  :root{
+    --ink:#0d1114;
+    --panel:#151b20;
+    --panel-2:#1b2329;
+    --line:#28323a;
+    --text:#e9edf0;
+    --muted:#8695a1;
+    --faint:#5a6873;
+    --accent:#54b8ad;
+    --accent-dim:#2e6f68;
+    --guide:#ff5c5c;
+    --radius:6px;
+    --mono:"SF Mono",ui-monospace,"Cascadia Mono",Menlo,monospace;
+    --sans:"Avenir Next","Avenir","Segoe UI",system-ui,sans-serif;
+  }
+  html{color-scheme:dark}
+  body{
+    background:var(--ink);
+    color:var(--text);
+    font-family:var(--sans);
+    font-size:15px;
+    line-height:1.55;
+    min-height:100vh;
+  }
+  .wrap{max-width:1100px;margin:0 auto;padding:32px 24px 72px}
+
+  /* ---------- header ---------- */
+  header{display:flex;align-items:baseline;justify-content:space-between;gap:16px;flex-wrap:wrap;
+    border-bottom:1px solid var(--line);padding-bottom:20px;margin-bottom:28px}
+  .brand{display:flex;align-items:baseline;gap:14px}
+  .brand h1{font-size:22px;font-weight:600;letter-spacing:.02em}
+  .brand h1 .split{color:var(--guide)}
+  .tagline{color:var(--muted);font-size:14px}
+  .privacy{font-family:var(--mono);font-size:11px;color:var(--faint);letter-spacing:.06em;text-transform:uppercase;
+    display:flex;align-items:center;gap:8px}
+  .privacy::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--accent)}
+
+  /* ---------- layout ---------- */
+  .grid{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:24px;align-items:start}
+  @media (max-width:860px){.grid{grid-template-columns:1fr}}
+
+  /* ---------- stage ---------- */
+  .stage-card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden}
+  .stage-head{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-bottom:1px solid var(--line)}
+  .stage-head .label{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+  .stage-head .coords{font-family:var(--mono);font-size:11px;color:var(--faint);font-variant-numeric:tabular-nums}
+  .stage{position:relative;background:
+    repeating-conic-gradient(#11161a 0 25%, #0d1114 0 50%) 0 0/24px 24px;
+    min-height:340px;display:flex;align-items:center;justify-content:center}
+  .stage canvas{display:block;max-width:100%;height:auto;touch-action:none}
+  .stage.has-img{cursor:ew-resize}
+
+  /* empty state */
+  .empty{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    gap:14px;text-align:center;padding:32px;background:var(--panel)}
+  .empty.hidden{display:none}
+  .empty .glyph{width:64px;height:88px;border:1.5px solid var(--faint);border-radius:32px 32px 40px 40px;position:relative;opacity:.8}
+  .empty .glyph::after{content:"";position:absolute;top:-10px;bottom:-10px;left:50%;width:0;
+    border-left:1.5px dashed var(--guide)}
+  .empty p{color:var(--muted);max-width:34ch}
+  .empty .or{font-family:var(--mono);font-size:11px;color:var(--faint);letter-spacing:.1em;text-transform:uppercase}
+  .stage.dragover{outline:2px dashed var(--accent);outline-offset:-8px}
+
+  /* live camera view */
+  .live{position:absolute;inset:0;display:none;background:#000}
+  .live.active{display:block}
+  .live video{width:100%;height:100%;object-fit:cover;display:block}
+  .live video.mirrored{transform:scaleX(-1)}
+  .live .guide-v{position:absolute;top:0;bottom:0;left:50%;width:0;border-left:1.5px solid rgba(255,92,92,.9);pointer-events:none}
+  .live .guide-h{position:absolute;left:0;right:0;top:42%;height:0;border-top:1px dashed rgba(255,92,92,.45);pointer-events:none}
+  .live .guide-tip{position:absolute;top:10px;left:50%;transform:translateX(-50%);font-family:var(--mono);
+    font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.85);
+    background:rgba(0,0,0,.45);padding:4px 10px;border-radius:3px;pointer-events:none;white-space:nowrap}
+  .live .countdown{position:absolute;inset:0;display:none;align-items:center;justify-content:center;
+    font-family:var(--mono);font-size:120px;font-weight:600;color:#fff;text-shadow:0 2px 24px rgba(0,0,0,.6);pointer-events:none}
+  .live .countdown.active{display:flex}
+  .cam-bar{position:absolute;left:0;right:0;bottom:0;display:flex;gap:10px;justify-content:center;align-items:center;
+    padding:14px;background:linear-gradient(transparent,rgba(0,0,0,.65))}
+  .cam-bar button{backdrop-filter:blur(4px)}
+  .cam-bar .shutter{width:58px;height:58px;border-radius:50%;padding:0;background:#fff;border:4px solid rgba(255,255,255,.35);
+    background-clip:content-box;flex-shrink:0}
+  .cam-bar .shutter:hover{background-color:var(--accent)}
+  .cam-bar select{font:inherit;font-size:12px;background:rgba(0,0,0,.55);color:#fff;
+    border:1px solid rgba(255,255,255,.25);border-radius:var(--radius);padding:8px 10px;max-width:190px;display:none}
+  .cam-bar select.multi{display:block}
+  .cam-error{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;
+    gap:10px;padding:32px;text-align:center;background:var(--panel)}
+  .cam-error.active{display:flex}
+  .cam-error p{color:var(--muted);max-width:40ch;font-size:13px}
+
+  /* live mode sizes the stage to the viewport so video + controls share one screen */
+  .stage.live-mode{min-height:min(66dvh,600px)}
+  @media (max-width:600px){
+    .wrap{padding:18px 14px 48px}
+    header{margin-bottom:18px;padding-bottom:14px}
+    .stage{min-height:260px}
+    .stage.live-mode{min-height:min(62dvh,520px)}
+    .cam-bar{flex-wrap:wrap;gap:8px;padding:10px;
+      background:linear-gradient(transparent,rgba(0,0,0,.75) 40%)}
+    .cam-bar button{padding:7px 10px;font-size:13px}
+    .cam-bar .shutter{width:50px;height:50px}
+    .cam-bar select{flex-basis:100%;max-width:none;order:5}
+    .live .guide-tip{font-size:9px;max-width:92%;white-space:normal;text-align:center}
+    .live .countdown{font-size:88px}
+  }
+
+  /* ---------- controls ---------- */
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:18px;display:flex;flex-direction:column;gap:18px}
+  .panel h2{font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:500}
+  .ctl{display:flex;flex-direction:column;gap:8px}
+  .ctl .row{display:flex;justify-content:space-between;align-items:baseline}
+  .ctl label{font-size:13px;color:var(--text)}
+  .ctl output{font-family:var(--mono);font-size:12px;color:var(--accent);font-variant-numeric:tabular-nums}
+  input[type=range]{width:100%;accent-color:var(--accent);height:22px}
+  .hint{font-size:12px;color:var(--faint)}
+
+  button{font:inherit;border-radius:var(--radius);border:1px solid var(--line);background:var(--panel-2);
+    color:var(--text);padding:9px 14px;cursor:pointer;font-size:14px;transition:border-color .15s,background .15s}
+  button:hover{border-color:var(--accent-dim)}
+  button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  button.primary{background:var(--accent);border-color:var(--accent);color:#08211e;font-weight:600}
+  button.primary:hover{background:#63c8bd}
+  button.primary:disabled{background:var(--panel-2);border-color:var(--line);color:var(--faint);cursor:not-allowed}
+  button.ghost{background:none}
+  .btn-row{display:flex;gap:10px;flex-wrap:wrap}
+  .btn-row button{flex:1}
+
+  /* guidelines */
+  .rules{display:flex;flex-direction:column;gap:8px}
+  .rules li{display:flex;gap:10px;font-size:13px;color:var(--muted);list-style:none}
+  .rules li::before{content:"—";color:var(--accent);flex-shrink:0}
+
+  /* ---------- results ---------- */
+  .results{margin-top:32px}
+  .results h2{font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);
+    font-weight:500;margin-bottom:14px;display:flex;align-items:center;gap:12px}
+  .results h2::after{content:"";flex:1;height:1px;background:var(--line)}
+  .tri{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+  @media (max-width:720px){.tri{grid-template-columns:1fr}}
+  .out{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;
+    display:flex;flex-direction:column}
+  .out .img{background:#0a0d10;display:flex;align-items:center;justify-content:center;aspect-ratio:4/5}
+  .out canvas{max-width:100%;max-height:100%;display:block}
+  .out .meta{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;border-top:1px solid var(--line)}
+  .out .name{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--text)}
+  .out .name em{font-style:normal;color:var(--guide)}
+  .out .dl{font-size:12px;padding:5px 10px}
+  .results.hidden{display:none}
+  .readout{margin-top:14px;font-family:var(--mono);font-size:12px;color:var(--faint);font-variant-numeric:tabular-nums}
+
+  footer{margin-top:56px;border-top:1px solid var(--line);padding-top:16px;color:var(--faint);font-size:12px;
+    display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="brand">
+      <h1>Chimera<span class="split">|</span>View</h1>
+      <span class="tagline">Facial symmetry viewer — split, mirror, compare</span>
+    </div>
+    <span class="privacy">Runs locally · photos never leave this device</span>
+  </header>
+
+  <div class="grid">
+    <div class="stage-card">
+      <div class="stage-head">
+        <span class="label">Alignment stage</span>
+        <span class="coords" id="coords">—</span>
+      </div>
+      <div class="stage" id="stage">
+        <canvas id="stageCanvas" width="800" height="600"></canvas>
+        <div class="empty" id="empty">
+          <div class="glyph" aria-hidden="true"></div>
+          <p>Drop a straight-on, neutral-expression photo here — or load one below.</p>
+          <div class="btn-row" style="width:100%;max-width:420px">
+            <button class="primary" id="cameraBtn">Use camera</button>
+            <button id="pickBtn">Choose photo</button>
+            <button id="sampleBtn">Sample face</button>
+          </div>
+          <span class="or">Live capture or JPG / PNG · everything stays in your browser</span>
+        </div>
+        <div class="live" id="live">
+          <video id="video" autoplay playsinline muted></video>
+          <div class="guide-v"></div>
+          <div class="guide-h"></div>
+          <span class="guide-tip">Center your nose bridge on the red line · eyes on the dashed line</span>
+          <div class="countdown" id="countdown"></div>
+          <div class="cam-bar">
+            <button id="cancelCamBtn">Cancel</button>
+            <button id="timerBtn" title="Capture after a 3-second countdown">3s timer</button>
+            <button class="shutter" id="captureBtn" aria-label="Capture photo"></button>
+            <button id="flipBtn" title="Switch between front and back camera">Flip</button>
+            <select id="camSelect" aria-label="Camera input"></select>
+          </div>
+        </div>
+        <div class="cam-error" id="camError">
+          <p id="camErrorMsg"></p>
+          <div class="btn-row">
+            <button class="primary" id="nativeCamBtn">Open camera app</button>
+            <button id="camErrorBack">Back</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <aside class="panel">
+      <h2>Alignment</h2>
+      <div class="ctl">
+        <div class="row"><label for="midline">Midline position</label><output id="midOut">50.0%</output></div>
+        <input type="range" id="midline" min="20" max="80" step="0.1" value="50" disabled>
+        <span class="hint">Drag the red cursor on the photo, or use this slider. Place it exactly on the facial midline — nose bridge to chin.</span>
+      </div>
+      <div class="ctl">
+        <div class="row"><label for="rotate">Fine rotation</label><output id="rotOut">0.0°</output></div>
+        <input type="range" id="rotate" min="-10" max="10" step="0.1" value="0" disabled>
+        <span class="hint">Level the eyes if the head is slightly tilted.</span>
+      </div>
+      <div class="btn-row">
+        <button class="primary" id="generateBtn" disabled>Generate composites</button>
+      </div>
+      <div class="btn-row">
+        <button class="ghost" id="retakeBtn">Camera</button>
+        <button class="ghost" id="replaceBtn">Replace photo</button>
+        <button class="ghost" id="resetBtn" disabled>Reset</button>
+      </div>
+
+      <h2>Photo checklist</h2>
+      <ul class="rules">
+        <li>Look directly into the lens, eyes level</li>
+        <li>Neutral expression — no smile</li>
+        <li>Remove glasses, hats; hair off the ears</li>
+        <li>Even, front-facing light; frame face to neck</li>
+      </ul>
+    </aside>
+  </div>
+
+  <section class="results hidden" id="results">
+    <h2>Composites</h2>
+    <div class="tri">
+      <figure class="out">
+        <div class="img"><canvas id="outOriginal"></canvas></div>
+        <figcaption class="meta">
+          <span class="name">Original</span>
+          <button class="dl" data-dl="outOriginal" data-name="original">Download</button>
+        </figcaption>
+      </figure>
+      <figure class="out">
+        <div class="img"><canvas id="outLeft"></canvas></div>
+        <figcaption class="meta">
+          <span class="name">Left <em>|</em> Left</span>
+          <button class="dl" data-dl="outLeft" data-name="left-left">Download</button>
+        </figcaption>
+      </figure>
+      <figure class="out">
+        <div class="img"><canvas id="outRight"></canvas></div>
+        <figcaption class="meta">
+          <span class="name">Right <em>|</em> Right</span>
+          <button class="dl" data-dl="outRight" data-name="right-right">Download</button>
+        </figcaption>
+      </figure>
+    </div>
+    <p class="readout" id="readout"></p>
+  </section>
+
+  <footer>
+    <span>Splits the photo along the vertical midline and mirrors each half into two symmetrical composite faces.</span>
+    <span>A visualization aid, not a diagnostic instrument.</span>
+  </footer>
+</div>
+
+<input type="file" id="fileInput" accept="image/*" hidden>
+<input type="file" id="captureInput" accept="image/*" capture="user" hidden>
+
+<script>
+(() => {
+  const stage = document.getElementById('stage');
+  const sc = document.getElementById('stageCanvas');
+  const sctx = sc.getContext('2d');
+  const empty = document.getElementById('empty');
+  const fileInput = document.getElementById('fileInput');
+  const midline = document.getElementById('midline');
+  const rotate = document.getElementById('rotate');
+  const midOut = document.getElementById('midOut');
+  const rotOut = document.getElementById('rotOut');
+  const coords = document.getElementById('coords');
+  const generateBtn = document.getElementById('generateBtn');
+  const resetBtn = document.getElementById('resetBtn');
+  const results = document.getElementById('results');
+  const readout = document.getElementById('readout');
+
+  let img = null;          // baked (rotated) source canvas
+  let rawImg = null;       // original Image
+  let mid = 0.5;           // 0..1
+  let rot = 0;             // degrees
+
+  const MAXW = 1400;       // cap working resolution
+
+  function bake() {
+    if (!rawImg) return;
+    const scale = Math.min(1, MAXW / rawImg.naturalWidth);
+    const w = Math.round(rawImg.naturalWidth * scale);
+    const h = Math.round(rawImg.naturalHeight * scale);
+    const rad = rot * Math.PI / 180;
+    const c = document.createElement('canvas');
+    c.width = w; c.height = h;
+    const x = c.getContext('2d');
+    x.translate(w / 2, h / 2);
+    x.rotate(rad);
+    // slight over-scale so rotation doesn't expose corners
+    const over = 1 + Math.abs(Math.sin(rad)) * (w > h ? w / h : h / w) * 0.5;
+    x.scale(over, over);
+    x.drawImage(rawImg, -w / 2, -h / 2, w, h);
+    img = c;
+  }
+
+  function drawStage() {
+    if (!img) return;
+    const maxW = Math.min(stage.clientWidth, 800);
+    const scale = Math.min(maxW / img.width, 560 / img.height);
+    sc.width = Math.round(img.width * scale);
+    sc.height = Math.round(img.height * scale);
+    sctx.drawImage(img, 0, 0, sc.width, sc.height);
+    // midline cursor
+    const x = Math.round(mid * sc.width) + 0.5;
+    sctx.strokeStyle = 'rgba(255,92,92,0.95)';
+    sctx.lineWidth = 1.5;
+    sctx.beginPath(); sctx.moveTo(x, 0); sctx.lineTo(x, sc.height); sctx.stroke();
+    // handle ticks
+    sctx.fillStyle = 'rgba(255,92,92,0.95)';
+    [[x, 0], [x, sc.height]].forEach(([tx, ty], i) => {
+      sctx.beginPath();
+      if (i === 0) { sctx.moveTo(tx - 6, 0); sctx.lineTo(tx + 6, 0); sctx.lineTo(tx, 9); }
+      else { sctx.moveTo(tx - 6, ty); sctx.lineTo(tx + 6, ty); sctx.lineTo(tx, ty - 9); }
+      sctx.closePath(); sctx.fill();
+    });
+    coords.textContent = `midline ${(mid * 100).toFixed(1)}%  ·  rot ${rot.toFixed(1)}°  ·  ${img.width}×${img.height}px`;
+  }
+
+  function setImage(image) {
+    stopCamera();
+    rawImg = image;
+    mid = 0.5; rot = 0;
+    midline.value = 50; rotate.value = 0;
+    midOut.textContent = '50.0%'; rotOut.textContent = '0.0°';
+    midline.disabled = rotate.disabled = generateBtn.disabled = resetBtn.disabled = false;
+    empty.classList.add('hidden');
+    stage.classList.add('has-img');
+    results.classList.add('hidden');
+    bake(); drawStage();
+  }
+
+  function loadFile(file) {
+    if (!file || !file.type.startsWith('image/')) return;
+    const url = URL.createObjectURL(file);
+    const image = new Image();
+    image.onload = () => { URL.revokeObjectURL(url); setImage(image); };
+    image.src = url;
+  }
+
+  // ---------- composites ----------
+  function mirrorComposite(fromLeft) {
+    const w = img.width, h = img.height;
+    const m = Math.round(mid * w);
+    const half = fromLeft ? m : w - m;
+    const c = document.createElement('canvas');
+    c.width = half * 2; c.height = h;
+    const x = c.getContext('2d');
+    if (fromLeft) {
+      x.drawImage(img, 0, 0, half, h, 0, 0, half, h);
+      x.save(); x.translate(half * 2, 0); x.scale(-1, 1);
+      x.drawImage(img, 0, 0, half, h, 0, 0, half, h); x.restore();
+    } else {
+      x.save(); x.translate(half, 0); x.scale(-1, 1);
+      x.drawImage(img, m, 0, half, h, 0, 0, half, h); x.restore();
+      x.drawImage(img, m, 0, half, h, half, 0, half, h);
+    }
+    return c;
+  }
+
+  function blit(id, src) {
+    const c = document.getElementById(id);
+    c.width = src.width; c.height = src.height;
+    c.getContext('2d').drawImage(src, 0, 0);
+  }
+
+  function generate() {
+    if (!img) return;
+    blit('outOriginal', img);
+    blit('outLeft', mirrorComposite(true));
+    blit('outRight', mirrorComposite(false));
+    const m = Math.round(mid * img.width);
+    readout.textContent =
+      `split at x=${m}px of ${img.width}px  ·  left-left ${m * 2}×${img.height}  ·  right-right ${(img.width - m) * 2}×${img.height}`;
+    results.classList.remove('hidden');
+    results.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  // ---------- sample face (deliberately asymmetric) ----------
+  function sampleFace() {
+    const c = document.createElement('canvas');
+    c.width = 640; c.height = 800;
+    const x = c.getContext('2d');
+    const g = x.createLinearGradient(0, 0, 0, 800);
+    g.addColorStop(0, '#3b4a56'); g.addColorStop(1, '#26313a');
+    x.fillStyle = g; x.fillRect(0, 0, 640, 800);
+    // neck + shoulders
+    x.fillStyle = '#c99b7c'; x.fillRect(265, 600, 110, 120);
+    x.fillStyle = '#46555f';
+    x.beginPath(); x.moveTo(80, 800); x.quadraticCurveTo(320, 640, 560, 800); x.closePath(); x.fill();
+    // head — asymmetric jaw
+    x.fillStyle = '#d9ab88';
+    x.beginPath();
+    x.moveTo(320, 130);
+    x.bezierCurveTo(180, 130, 150, 260, 158, 380);   // left cranium
+    x.bezierCurveTo(163, 500, 220, 610, 320, 640);   // left jaw (fuller)
+    x.bezierCurveTo(400, 615, 460, 520, 470, 400);   // right jaw (tighter)
+    x.bezierCurveTo(482, 265, 455, 130, 320, 130);   // right cranium
+    x.closePath(); x.fill();
+    // hair
+    x.fillStyle = '#3a2e26';
+    x.beginPath();
+    x.moveTo(160, 300); x.bezierCurveTo(140, 120, 240, 70, 325, 72);
+    x.bezierCurveTo(430, 70, 500, 140, 468, 310);
+    x.bezierCurveTo(450, 210, 400, 175, 320, 178);
+    x.bezierCurveTo(240, 175, 185, 215, 160, 300);
+    x.closePath(); x.fill();
+    // brows — right sits higher
+    x.strokeStyle = '#3a2e26'; x.lineWidth = 10; x.lineCap = 'round';
+    x.beginPath(); x.moveTo(205, 322); x.quadraticCurveTo(245, 308, 285, 318); x.stroke();
+    x.beginPath(); x.moveTo(355, 308); x.quadraticCurveTo(395, 294, 435, 306); x.stroke();
+    // eyes — different heights and sizes
+    function eye(cx, cy, rw, rh) {
+      x.fillStyle = '#fff';
+      x.beginPath(); x.ellipse(cx, cy, rw, rh, 0, 0, Math.PI * 2); x.fill();
+      x.fillStyle = '#4a3a2c';
+      x.beginPath(); x.arc(cx, cy, rh * 0.62, 0, Math.PI * 2); x.fill();
+      x.fillStyle = '#1c140e';
+      x.beginPath(); x.arc(cx, cy, rh * 0.3, 0, Math.PI * 2); x.fill();
+    }
+    eye(245, 362, 34, 15);
+    eye(398, 352, 30, 13);
+    // nose — deviates left
+    x.strokeStyle = '#b98a68'; x.lineWidth = 7;
+    x.beginPath(); x.moveTo(322, 360); x.quadraticCurveTo(305, 440, 300, 470); x.stroke();
+    x.beginPath(); x.moveTo(300, 470); x.quadraticCurveTo(322, 486, 342, 470); x.stroke();
+    // mouth — corner droops on the left
+    x.strokeStyle = '#9c5a4c'; x.lineWidth = 9;
+    x.beginPath(); x.moveTo(248, 545); x.quadraticCurveTo(320, 566, 392, 532); x.stroke();
+    // ears — different heights
+    x.fillStyle = '#d0a07e';
+    x.beginPath(); x.ellipse(158, 400, 16, 30, 0, 0, Math.PI * 2); x.fill();
+    x.beginPath(); x.ellipse(472, 382, 15, 27, 0, 0, Math.PI * 2); x.fill();
+    const image = new Image();
+    image.onload = () => setImage(image);
+    image.src = c.toDataURL('image/png');
+  }
+
+  // ---------- camera ----------
+  const live = document.getElementById('live');
+  const video = document.getElementById('video');
+  const camError = document.getElementById('camError');
+  const camErrorMsg = document.getElementById('camErrorMsg');
+  const countdown = document.getElementById('countdown');
+  let stream = null;
+  let facing = 'user';
+  let counting = false;
+
+  // device selection — prefer the built-in camera over Continuity/virtual devices
+  const camSelect = document.getElementById('camSelect');
+  const PREFER = /built-in|facetime|integrated/i;
+  const AVOID = /iphone|ipad|continuity|virtual|obs|snap camera|droidcam|epoccam|ndi/i;
+  let deviceId = null;
+  let autoSwitched = false;
+  try { deviceId = localStorage.getItem('chimera-cam') || null; } catch (e) {}
+
+  async function videoInputs() {
+    const devs = await navigator.mediaDevices.enumerateDevices();
+    return devs.filter(d => d.kind === 'videoinput');
+  }
+
+  function pickPreferred(cams, currentId) {
+    const pref = cams.find(c => PREFER.test(c.label));
+    if (pref) return pref.deviceId;
+    const real = cams.find(c => c.label && !AVOID.test(c.label));
+    return real ? real.deviceId : currentId;
+  }
+
+  function fillCamSelect(cams, currentId) {
+    camSelect.innerHTML = '';
+    cams.forEach((c, i) => {
+      const o = document.createElement('option');
+      o.value = c.deviceId;
+      o.textContent = c.label || 'Camera ' + (i + 1);
+      camSelect.appendChild(o);
+    });
+    camSelect.value = currentId;
+    camSelect.classList.toggle('multi', cams.length > 1);
+  }
+
+  const captureInput = document.getElementById('captureInput');
+  const embedded = window.self !== window.top;
+
+  function policyBlocksCamera() {
+    const p = document.permissionsPolicy || document.featurePolicy;
+    try { if (p && p.allowsFeature && !p.allowsFeature('camera')) return true; } catch (e) {}
+    return false;
+  }
+
+  async function openCamera() {
+    stopCamera();
+    camError.classList.remove('active');
+    // sandboxed embeds (like this page on claude.ai) never grant live camera access —
+    // hand off to the device's native camera app instead, synchronously to keep user activation
+    if (policyBlocksCamera()) { captureInput.click(); return; }
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      return showCamError('This browser can’t show a live camera view here. "Open camera app" takes the photo with your device’s own camera and drops it straight in.');
+    }
+    const size = { width: { ideal: 1280 }, height: { ideal: 1440 } };
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: deviceId ? { deviceId: { exact: deviceId }, ...size } : { facingMode: facing, ...size },
+        audio: false
+      });
+    } catch (err) {
+      // remembered device may be gone (unplugged, iPhone out of range) — retry with defaults
+      if (deviceId) {
+        deviceId = null;
+        try { localStorage.removeItem('chimera-cam'); } catch (e) {}
+        return openCamera();
+      }
+      const denied = err && (err.name === 'NotAllowedError' || err.name === 'SecurityError');
+      const msg = denied && embedded
+        ? 'This embedded page isn’t allowed to open a live camera view. "Open camera app" uses your device’s own camera instead — the photo drops straight in, nothing is uploaded.'
+        : denied
+          ? 'Camera access was denied. Allow camera permission for this page, or use "Open camera app" to take the photo with your device’s camera.'
+          : 'No live camera could be opened on this device. "Open camera app" uses your device’s own camera instead.';
+      return showCamError(msg);
+    }
+    const currentId = (stream.getVideoTracks()[0].getSettings() || {}).deviceId;
+    const cams = await videoInputs().catch(() => []);
+    // first open with no saved choice: if the browser defaulted to a Continuity/virtual
+    // camera and a built-in exists, switch to it once
+    if (!deviceId && !autoSwitched && cams.length > 1) {
+      const want = pickPreferred(cams, currentId);
+      if (want && want !== currentId) { autoSwitched = true; deviceId = want; return openCamera(); }
+    }
+    deviceId = currentId || deviceId;
+    fillCamSelect(cams, deviceId);
+    video.srcObject = stream;
+    video.classList.toggle('mirrored', facing === 'user');
+    empty.classList.add('hidden');
+    live.classList.add('active');
+    stage.classList.add('live-mode');
+    stage.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  function stopCamera() {
+    if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
+    video.srcObject = null;
+    live.classList.remove('active');
+    stage.classList.remove('live-mode');
+    countdown.classList.remove('active');
+    counting = false;
+  }
+
+  function showCamError(msg) {
+    stopCamera();
+    camErrorMsg.textContent = msg;
+    camError.classList.add('active');
+  }
+
+  function captureFrame() {
+    if (!stream || !video.videoWidth) return;
+    const c = document.createElement('canvas');
+    c.width = video.videoWidth; c.height = video.videoHeight;
+    const x = c.getContext('2d');
+    // capture exactly what the preview shows (front camera preview is mirrored)
+    if (facing === 'user') { x.translate(c.width, 0); x.scale(-1, 1); }
+    x.drawImage(video, 0, 0);
+    const image = new Image();
+    image.onload = () => { stopCamera(); setImage(image); };
+    image.src = c.toDataURL('image/png');
+  }
+
+  function timedCapture() {
+    if (counting || !stream) return;
+    counting = true;
+    let n = 3;
+    countdown.classList.add('active');
+    countdown.textContent = n;
+    const tick = setInterval(() => {
+      n -= 1;
+      if (!stream) { clearInterval(tick); counting = false; return; }
+      if (n <= 0) {
+        clearInterval(tick);
+        countdown.classList.remove('active');
+        counting = false;
+        captureFrame();
+      } else {
+        countdown.textContent = n;
+      }
+    }, 1000);
+  }
+
+  document.getElementById('cameraBtn').onclick = openCamera;
+  document.getElementById('retakeBtn').onclick = openCamera;
+  document.getElementById('captureBtn').onclick = captureFrame;
+  document.getElementById('timerBtn').onclick = timedCapture;
+  document.getElementById('flipBtn').onclick = () => {
+    facing = facing === 'user' ? 'environment' : 'user';
+    deviceId = null;
+    openCamera();
+  };
+  camSelect.onchange = () => {
+    deviceId = camSelect.value;
+    try { localStorage.setItem('chimera-cam', deviceId); } catch (e) {}
+    openCamera();
+  };
+  document.getElementById('cancelCamBtn').onclick = () => {
+    stopCamera();
+    if (!img) empty.classList.remove('hidden');
+  };
+  document.getElementById('camErrorBack').onclick = () => {
+    camError.classList.remove('active');
+    if (!img) empty.classList.remove('hidden');
+  };
+  document.getElementById('nativeCamBtn').onclick = () => {
+    camError.classList.remove('active');
+    if (!img) empty.classList.remove('hidden');
+    captureInput.click();
+  };
+  captureInput.onchange = e => { loadFile(e.target.files[0]); captureInput.value = ''; };
+
+  // ---------- events ----------
+  document.getElementById('pickBtn').onclick = () => fileInput.click();
+  document.getElementById('replaceBtn').onclick = () => fileInput.click();
+  document.getElementById('sampleBtn').onclick = sampleFace;
+  fileInput.onchange = e => loadFile(e.target.files[0]);
+
+  document.getElementById('resetBtn').onclick = () => {
+    mid = 0.5; rot = 0;
+    midline.value = 50; rotate.value = 0;
+    midOut.textContent = '50.0%'; rotOut.textContent = '0.0°';
+    bake(); drawStage();
+  };
+
+  midline.oninput = () => {
+    mid = midline.value / 100;
+    midOut.textContent = (+midline.value).toFixed(1) + '%';
+    drawStage();
+  };
+  rotate.oninput = () => {
+    rot = +rotate.value;
+    rotOut.textContent = rot.toFixed(1) + '°';
+    bake(); drawStage();
+  };
+  generateBtn.onclick = generate;
+
+  // drag midline on canvas
+  let dragging = false;
+  sc.addEventListener('pointerdown', e => {
+    if (!img) return;
+    dragging = true; sc.setPointerCapture(e.pointerId); moveMid(e);
+  });
+  sc.addEventListener('pointermove', e => { if (dragging) moveMid(e); });
+  sc.addEventListener('pointerup', () => dragging = false);
+  function moveMid(e) {
+    const r = sc.getBoundingClientRect();
+    mid = Math.min(0.8, Math.max(0.2, (e.clientX - r.left) / r.width));
+    midline.value = mid * 100;
+    midOut.textContent = (mid * 100).toFixed(1) + '%';
+    drawStage();
+  }
+
+  // drag & drop
+  ['dragenter', 'dragover'].forEach(ev => stage.addEventListener(ev, e => {
+    e.preventDefault(); stage.classList.add('dragover');
+  }));
+  ['dragleave', 'drop'].forEach(ev => stage.addEventListener(ev, e => {
+    e.preventDefault(); stage.classList.remove('dragover');
+  }));
+  stage.addEventListener('drop', e => loadFile(e.dataTransfer.files[0]));
+
+  // downloads
+  document.querySelectorAll('.dl').forEach(btn => btn.onclick = () => {
+    const c = document.getElementById(btn.dataset.dl);
+    const a = document.createElement('a');
+    a.download = `chimera-${btn.dataset.name}.png`;
+    a.href = c.toDataURL('image/png');
+    a.click();
+  });
+
+  window.addEventListener('resize', drawStage);
+
+  // hide stage canvas until an image exists
+  sc.width = 0; sc.height = 0;
+})();
+</script>
+</html>
