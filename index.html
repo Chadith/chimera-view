@@ -582,7 +582,8 @@
   const camErrorMsg = document.getElementById('camErrorMsg');
   const countdown = document.getElementById('countdown');
   let stream = null;
-  let facing = 'user';
+  let facing = 'user';       // requested facingMode (flip button)
+  let frontFacing = true;    // actual: only mirror true front/selfie cameras
   let counting = false;
 
   // device selection — prefer the built-in camera over Continuity/virtual devices
@@ -665,7 +666,16 @@
           : 'No live camera could be opened on this device. "Open camera app" uses your device’s own camera instead.';
       return showCamError(msg);
     }
-    const currentId = (stream.getVideoTracks()[0].getSettings() || {}).deviceId;
+    const track = stream.getVideoTracks()[0];
+    const st = track.getSettings() || {};
+    const currentId = st.deviceId;
+    // decide mirroring from the ACTUAL camera, not just the requested facingMode —
+    // so a rear camera picked from the dropdown is never mirrored/flipped
+    const label = (track.label || '').toLowerCase();
+    if (st.facingMode) frontFacing = st.facingMode === 'user';
+    else if (/back|rear|environment|world/.test(label)) frontFacing = false;
+    else if (/front|face|user|integrated|facetime|selfie/.test(label)) frontFacing = true;
+    else frontFacing = facing === 'user';
     const cams = await videoInputs().catch(() => []);
     // first open with no saved choice: if the browser defaulted to a Continuity/virtual
     // camera and a built-in exists, switch to it once
@@ -686,7 +696,7 @@
 
   // preview mirroring + tilt; transform order matches the capture-then-bake pipeline
   function updateVideoTransform() {
-    video.style.transform = 'rotate(' + rot + 'deg) scaleX(' + (facing === 'user' ? -1 : 1) + ')';
+    video.style.transform = 'rotate(' + rot + 'deg) scaleX(' + (frontFacing ? -1 : 1) + ')';
   }
 
   function stopCamera() {
@@ -719,8 +729,8 @@
     const c = document.createElement('canvas');
     c.width = video.videoWidth; c.height = video.videoHeight;
     const x = c.getContext('2d');
-    // capture exactly what the preview shows (front camera preview is mirrored)
-    if (facing === 'user') { x.translate(c.width, 0); x.scale(-1, 1); }
+    // capture exactly what the preview shows (only true front/selfie cameras are mirrored)
+    if (frontFacing) { x.translate(c.width, 0); x.scale(-1, 1); }
     x.drawImage(video, 0, 0);
     const image = new Image();
     // keep any tilt dialed in during the live preview — bake() applies it to the capture
