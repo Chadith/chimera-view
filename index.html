@@ -88,11 +88,13 @@
   .live{position:absolute;inset:0;display:none;background:#000}
   .live.active{display:block}
   .live video{width:100%;height:100%;object-fit:cover;display:block}
-  .live .guide-v{position:absolute;top:0;bottom:0;left:50%;width:0;border-left:1.5px solid rgba(255,92,92,.9);pointer-events:none}
-  .live .guide-h{position:absolute;left:0;right:0;top:42%;height:0;border-top:1px dashed rgba(90,150,255,.7);pointer-events:none}
-  .live .guide-tip{position:absolute;bottom:96px;left:50%;transform:translateX(-50%);font-family:var(--mono);
-    font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.85);
-    background:rgba(0,0,0,.45);padding:4px 10px;border-radius:3px;pointer-events:none;white-space:nowrap}
+  .live .guide-v{position:absolute;top:0;bottom:0;left:50%;width:0;border-left:2.5px solid rgba(255,92,92,.95);
+    filter:drop-shadow(0 0 2px rgba(0,0,0,.55));pointer-events:none}
+  .live .guide-h{position:absolute;left:0;right:0;top:42%;height:0;border-top:2px dashed rgba(90,160,255,.95);
+    filter:drop-shadow(0 0 2px rgba(0,0,0,.55));pointer-events:none}
+  .live .guide-tip{position:absolute;top:10px;left:10px;max-width:calc(100% - 96px);font-family:var(--mono);
+    font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.85);
+    background:rgba(0,0,0,.5);padding:4px 10px;border-radius:3px;pointer-events:none;line-height:1.4}
   .live .countdown{position:absolute;inset:0;display:none;align-items:center;justify-content:center;
     font-family:var(--mono);font-size:120px;font-weight:600;color:#fff;text-shadow:0 2px 24px rgba(0,0,0,.6);pointer-events:none}
   .live .countdown.active{display:flex}
@@ -163,7 +165,7 @@
     .cam-bar button{padding:7px 10px;font-size:13px}
     .cam-bar .shutter{width:50px;height:50px}
     .cam-bar select{flex-basis:100%;max-width:none;order:5}
-    .live .guide-tip{font-size:9px;max-width:92%;white-space:normal;text-align:center;bottom:118px}
+    .live .guide-tip{font-size:9px;max-width:calc(100% - 76px);white-space:normal;text-align:left;top:10px;bottom:auto}
     .live .countdown{font-size:88px}
     .rot-slot{height:128px}
     .rot-slot input[type=range]{height:128px}
@@ -415,7 +417,7 @@
     // midline cursor
     const x = Math.round(mid * sc.width) + 0.5;
     sctx.strokeStyle = 'rgba(255,92,92,0.95)';
-    sctx.lineWidth = 1.5;
+    sctx.lineWidth = 2.5;
     sctx.beginPath(); sctx.moveTo(x, 0); sctx.lineTo(x, sc.height); sctx.stroke();
     // handle ticks
     sctx.fillStyle = 'rgba(255,92,92,0.95)';
