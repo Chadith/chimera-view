@@ -334,14 +334,14 @@
       <figure class="out">
         <div class="img"><canvas id="outLeft"></canvas></div>
         <figcaption class="meta">
-          <span class="name">Patient <em>|</em> Right</span>
+          <span class="name" id="nameLeft">Patient <em>|</em> Right</span>
           <button class="dl" data-dl="outLeft" data-name="patient-right">Download</button>
         </figcaption>
       </figure>
       <figure class="out">
         <div class="img"><canvas id="outRight"></canvas></div>
         <figcaption class="meta">
-          <span class="name">Patient <em>|</em> Left</span>
+          <span class="name" id="nameRight">Patient <em>|</em> Left</span>
           <button class="dl" data-dl="outRight" data-name="patient-left">Download</button>
         </figcaption>
       </figure>
@@ -386,6 +386,7 @@
   let rawImg = null;       // original Image
   let mid = 0.5;           // 0..1
   let rot = 0;             // degrees
+  let sourceMirrored = false; // true when the image came from a mirrored selfie (front cam)
 
   const MAXW = 1400;       // cap working resolution
 
@@ -479,7 +480,7 @@
     if (!file || !file.type.startsWith('image/')) return;
     const url = URL.createObjectURL(file);
     const image = new Image();
-    image.onload = () => { URL.revokeObjectURL(url); setImage(image); };
+    image.onload = () => { URL.revokeObjectURL(url); sourceMirrored = false; setImage(image); };
     image.src = url;
   }
 
@@ -544,17 +545,29 @@
     x.fillText(text, bx + padX, by + padY + s * 0.82);
   }
 
+  // label a composite figure by the patient's true anatomical side
+  function applySide(canvasId, nameId, side, corner) {
+    drawBadge(canvasId, side === 'Right' ? 'PR' : 'PL', corner);
+    document.getElementById(nameId).innerHTML = 'Patient <em>|</em> ' + side;
+    const dl = document.querySelector('.dl[data-dl="' + canvasId + '"]');
+    if (dl) dl.dataset.name = 'patient-' + side.toLowerCase();
+  }
+
   function generate() {
     if (!img) return;
     blit('outOriginal', img);
-    blit('outLeft', mirrorComposite(true));
-    blit('outRight', mirrorComposite(false));
-    drawBadge('outOriginal', 'ORIG', 'bc'); // Original — bottom center
-    drawBadge('outLeft', 'PR', 'bl');   // Patient Right — lower left
-    drawBadge('outRight', 'PL', 'br');  // Patient Left — lower right
+    blit('outLeft', mirrorComposite(true));   // screen-left half
+    blit('outRight', mirrorComposite(false)); // screen-right half
+    drawBadge('outOriginal', 'ORIG', 'bc');
+    // In a normal (un-mirrored) frontal photo, screen-left is the patient's RIGHT
+    // side (you're facing them). A mirrored selfie flips this — so follow the source.
+    const leftSide  = sourceMirrored ? 'Left'  : 'Right';
+    const rightSide = sourceMirrored ? 'Right' : 'Left';
+    applySide('outLeft',  'nameLeft',  leftSide,  'bl');
+    applySide('outRight', 'nameRight', rightSide, 'br');
     const m = Math.round(mid * img.width);
     readout.textContent =
-      `split at x=${m}px of ${img.width}px  ·  patient right ${m * 2}×${img.height}  ·  patient left ${(img.width - m) * 2}×${img.height}`;
+      `split at x=${m}px of ${img.width}px  ·  patient ${leftSide.toLowerCase()} ${m * 2}×${img.height}  ·  patient ${rightSide.toLowerCase()} ${(img.width - m) * 2}×${img.height}`;
     results.classList.remove('hidden');
     results.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
@@ -571,6 +584,7 @@
     do { i = Math.floor(Math.random() * SAMPLES.length); } while (SAMPLES.length > 1 && i === lastSample);
     lastSample = i;
     const image = new Image();
+    sourceMirrored = false;
     image.onload = () => { setImage(image); coords.textContent = SAMPLES[i].caption; };
     image.src = SAMPLES[i].data;
   }
@@ -734,6 +748,7 @@
     x.drawImage(video, 0, 0);
     const image = new Image();
     // keep any tilt dialed in during the live preview — bake() applies it to the capture
+    sourceMirrored = frontFacing; // a mirrored selfie flips the patient's true left/right
     image.onload = () => { stopCamera(); setImage(image, true); };
     image.src = c.toDataURL('image/png');
   }
